@@ -32,8 +32,8 @@ export default function Dashboard() {
       const res = await fetch("/api/files");
       const data = await res.json();
       setFiles(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -42,8 +42,8 @@ export default function Dashboard() {
       const res = await fetch("/api/players");
       const data = await res.json();
       setPlayers(data || []);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -71,11 +71,11 @@ export default function Dashboard() {
       // reset the input using the captured reference (avoid SyntheticEvent pooling)
       try {
         input.value = "";
-      } catch (err) {
+      } catch {
         // ignore if it fails
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       alert("Gagal upload");
     } finally {
       setUploading(false);
@@ -91,8 +91,8 @@ export default function Dashboard() {
       setPlayers((p) => [normalized, ...p]);
       setSelectedPlayer(data.code);
       setTab("players");
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -266,7 +266,7 @@ function PlaylistEditor({
     } catch {}
   }
 
-  function onDragOver(e: React.DragEvent, idx: number) {
+  function onDragOver(e: React.DragEvent) {
     e.preventDefault();
     try {
       e.dataTransfer!.dropEffect = "move";
@@ -339,7 +339,7 @@ function PlaylistEditor({
             className="flex items-center gap-3 border border-white/10 rounded p-2 bg-transparent hover:shadow-md hover:ring-2 hover:ring-white/20 transition-shadow transition-all duration-150 ease-out"
             draggable={true}
             onDragStart={(e) => onDragStart(e, i)}
-            onDragOver={(e) => onDragOver(e, i)}
+            onDragOver={(e) => onDragOver(e)}
             onDrop={(e) => onDrop(e, i)}
             onDragEnd={onDragEnd}
           >

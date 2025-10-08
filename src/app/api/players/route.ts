@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSupabase, hasSupabase } from "@/lib/supabase-server";
 
 const DATA_FILE = path.join(process.cwd(), "data", "players.json");
@@ -23,13 +23,13 @@ export async function GET() {
           .order("created_at", { ascending: false });
         if (error) throw error;
         return NextResponse.json(data || []);
-      } catch (err: any) {
+  } catch {
         // fallback to plain select if created_at doesn't exist or other error
         try {
           const { data, error } = await supabase.from("players").select("*");
-          if (error) console.error("players select error:", error.message);
+          if (error) console.error("players select error:", String(error.message ?? error));
           return NextResponse.json(data || []);
-        } catch (e) {
+        } catch (e: unknown) {
           console.error("players fallback select error:", e);
           // let filesystem fallback run below
         }
@@ -45,7 +45,13 @@ function generateCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export async function POST(req: NextRequest) {
+interface LocalPlayer {
+  code: string;
+  name?: string;
+  files?: string[];
+}
+
+export async function POST() {
   try {
     if (hasSupabase()) {
       const supabase = getSupabase();
@@ -66,7 +72,7 @@ export async function POST(req: NextRequest) {
             tries++;
           }
 
-          const pl = { code, name: `Player ${code}`, files: [] };
+          const pl: LocalPlayer = { code, name: `Player ${code}`, files: [] };
           const { data: inserted, error: insErr } = await supabase
             .from("players")
             .insert([pl])
@@ -85,7 +91,11 @@ export async function POST(req: NextRequest) {
             ) {
               const numericCode = parseInt(code, 10);
               if (!Number.isNaN(numericCode)) {
-                const plNum = { ...pl, code: numericCode } as any;
+                const plNum: { code: number; name: string; files: string[] } = {
+                  code: numericCode,
+                  name: pl.name ?? `Player ${numericCode}`,
+                  files: pl.files ?? [],
+                };
                 const { data: inserted2, error: insErr2 } = await supabase
                   .from("players")
                   .insert([plNum])
@@ -93,10 +103,7 @@ export async function POST(req: NextRequest) {
                   .limit(1)
                   .single();
                 if (!insErr2) return NextResponse.json(inserted2 || plNum);
-                console.error(
-                  "supabase insert numeric fallback error:",
-                  insErr2
-                );
+                console.error("supabase insert numeric fallback error:", insErr2);
                 // Fall through to local filesystem fallback below
               }
             }
@@ -107,11 +114,8 @@ export async function POST(req: NextRequest) {
           } else {
             return NextResponse.json(inserted || pl);
           }
-        } catch (supErr) {
-          console.error(
-            "Supabase operation failed, falling back to local storage:",
-            supErr
-          );
+        } catch (supErr: unknown) {
+          console.error("Supabase operation failed, falling back to local storage:", supErr);
           // fall through to filesystem fallback
         }
       }
@@ -119,19 +123,19 @@ export async function POST(req: NextRequest) {
 
     // fallback to local filesystem
     ensure();
-    const cur = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    const cur = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) as LocalPlayer[];
     let code = generateCode();
-    while (cur.find((p: any) => p.code === code)) code = generateCode();
-    const pl = { code, name: `Player ${code}`, files: [] };
+    while (cur.find((p: LocalPlayer) => p.code === code)) code = generateCode();
+    const pl: LocalPlayer = { code, name: `Player ${code}`, files: [] };
     cur.unshift(pl);
     fs.writeFileSync(DATA_FILE, JSON.stringify(cur, null, 2));
     return NextResponse.json(pl);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("players POST error:", err);
-    // If it's a Supabase error object, include its properties
-    const body: any = { error: String(err?.message || err) };
+    const body: Record<string, unknown> = { error: message };
     if (err && typeof err === "object") {
-      body.details = err;
+      body.details = err as Record<string, unknown>;
     }
     return NextResponse.json(body, { status: 500 });
   }

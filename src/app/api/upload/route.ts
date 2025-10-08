@@ -28,20 +28,16 @@ export async function POST(req: NextRequest) {
       const filename = `${id}${ext}`;
       const buffer = Buffer.from(await file.arrayBuffer());
       // upload to bucket 'uploads'
-      const { data, error: upErr } = await supabase.storage
+      const { error: upErr } = await supabase.storage
         .from("uploads")
         .upload(filename, buffer, { contentType: file.type });
-      if (upErr)
-        return NextResponse.json({ error: upErr.message }, { status: 500 });
-      const url = supabase.storage.from("uploads").getPublicUrl(filename)
-        .data.publicUrl;
+      if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+      const url = supabase.storage.from("uploads").getPublicUrl(filename).data.publicUrl;
       // optionally insert metadata to 'files' table if exists
       try {
-        await supabase
-          .from("files")
-          .insert([{ id, name, type: file.type, url }]);
-      } catch (e) {
-        // ignore if table not present
+        await supabase.from("files").insert([{ id, name, type: file.type, url }]);
+      } catch {
+        // ignore if table not present or insert fails
       }
       return NextResponse.json({ id, name, type: file.type, url });
     }

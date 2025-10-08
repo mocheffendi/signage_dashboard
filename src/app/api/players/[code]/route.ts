@@ -18,7 +18,7 @@ export async function PUT(
 ) {
   const p = await params;
   const code = p.code;
-  const body = await req.json();
+  const body = (await req.json()) as { files?: unknown };
 
   if (hasSupabase()) {
     const supabase = getSupabase();
@@ -32,10 +32,8 @@ export async function PUT(
         return NextResponse.json({ error: error.message }, { status: 500 });
       if (!data || data.length === 0)
         return NextResponse.json({ error: "not found" }, { status: 404 });
-      await supabase
-        .from("players")
-        .update({ files: body.files || [] })
-        .eq("code", code);
+      const updateFiles = Array.isArray(body.files) ? body.files : [];
+      await supabase.from("players").update({ files: updateFiles }).eq("code", code);
       const { data: updated } = await supabase
         .from("players")
         .select("*")
@@ -46,11 +44,11 @@ export async function PUT(
   }
 
   ensure();
-  const cur = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-  const idx = cur.findIndex((p: any) => p.code === code);
+  const cur = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) as Array<{ code: string; files?: string[] }>;
+  const idx = cur.findIndex((p) => p.code === code);
   if (idx === -1)
     return NextResponse.json({ error: "not found" }, { status: 404 });
-  cur[idx].files = body.files || [];
+  cur[idx].files = Array.isArray(body.files) ? body.files : [];
   fs.writeFileSync(DATA_FILE, JSON.stringify(cur, null, 2));
   return NextResponse.json(cur[idx]);
 }
