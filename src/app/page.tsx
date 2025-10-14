@@ -30,11 +30,7 @@ export default function Dashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  // modal for new template / rename (kept for possible modal flows)
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"new" | "rename">("new");
-  const [modalCanvasId, setModalCanvasId] = useState<string | null>(null);
-  const [modalName, setModalName] = useState<string>("Untitled");
+  // modal state removed — currently not used (kept rename/create inline)
 
   useEffect(() => {
     fetchFiles();
@@ -320,12 +316,35 @@ export default function Dashboard() {
                       </button>
                       <button
                         className="px-2 py-1 border rounded"
-                        onClick={() => {
-                          // open rename modal
-                          setModalMode("rename");
-                          setModalCanvasId(c.id);
-                          setModalName(c.name || "Untitled");
-                          setModalOpen(true);
+                        onClick={async () => {
+                          const newName = window.prompt(
+                            "Rename template",
+                            c.name || "Untitled"
+                          );
+                          if (!newName) return;
+                          try {
+                            const res = await fetch(
+                              `/api/canvas?id=${encodeURIComponent(c.id)}`
+                            );
+                            if (!res.ok) throw new Error("fetch failed");
+                            const data = await res.json();
+                            const body = {
+                              id: c.id,
+                              name: newName,
+                              layout: data.layout ?? [],
+                              timeline: data.timeline ?? [],
+                            };
+                            const post = await fetch("/api/canvas", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(body),
+                            });
+                            if (!post.ok) throw new Error("rename failed");
+                            fetchCanvases();
+                          } catch (err) {
+                            console.error(err);
+                            alert("Rename failed");
+                          }
                         }}
                       >
                         Rename

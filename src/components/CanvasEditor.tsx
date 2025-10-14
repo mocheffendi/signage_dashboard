@@ -1,6 +1,5 @@
 "use client";
-// eslint-disable-next-line
-/* eslint-disable @next/next/no-img-element, @next/next/no-inline-styles, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -487,8 +486,10 @@ export default function CanvasEditor({
       // pause all videos when not playing
       Object.values(videoRefs.current).forEach((v) => {
         try {
-          v?.pause();
-          v && (v.currentTime = 0);
+          if (v) {
+            v.pause();
+            v.currentTime = 0;
+          }
         } catch {}
       });
       return;
@@ -575,7 +576,7 @@ export default function CanvasEditor({
               type="checkbox"
               checked={loop}
               onChange={(e) => setLoop(e.target.checked)}
-            />{" "}
+            />
             Loop
           </label>
           {/* Canvas name input so user can rename while editing */}
@@ -762,7 +763,7 @@ export default function CanvasEditor({
                 type="checkbox"
                 checked={aspectLock}
                 onChange={(e) => setAspectLock(e.target.checked)}
-              />{" "}
+              />
               Lock Aspect Ratio
             </label>
             <div className="flex-1" />
@@ -960,7 +961,7 @@ export default function CanvasEditor({
                 </div>
               );
             const file = files.find((f) => f.id === sel.fileId);
-            const right = Math.max(0, Math.round(canvasWidth - sel.x - sel.w));
+            // const right = Math.max(0, Math.round(canvasWidth - sel.x - sel.w));
             const base = `inspector-${sel.id}`;
             return (
               <div className="mt-2 space-y-2">
