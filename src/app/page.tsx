@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  // modal for new template / rename
+  // modal for new template / rename (kept for possible modal flows)
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"new" | "rename">("new");
   const [modalCanvasId, setModalCanvasId] = useState<string | null>(null);

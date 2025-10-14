@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getSupabase, hasSupabase } from "@/lib/supabase-server";
 
 export async function GET(req: Request) {
-  const url = new URL((req as any).url || "http://localhost");
+  const rawUrl = (req as Request).url || "http://localhost";
+  const url = new URL(rawUrl);
   const id = url.searchParams.get("id");
   if (!hasSupabase())
     return NextResponse.json(
@@ -27,24 +28,39 @@ export async function GET(req: Request) {
       .order("order", { ascending: true });
 
     // normalize DB column names to client-friendly shape
-    const normalizedTimeline = (items || []).map((it: any) => ({
+    interface RawTimelineRow {
+      id: string;
+      file_id?: string;
+      fileId?: string;
+      order: number;
+      duration_seconds?: number;
+      duration?: number;
+      meta?: Record<string, unknown>;
+    }
+    const normalizedTimeline = (items || []).map((it: RawTimelineRow) => ({
       id: it.id,
-      fileId: it.file_id ?? it.fileId,
+      fileId: it.file_id ?? it.fileId ?? "",
       order: it.order,
       duration_seconds: it.duration_seconds ?? it.duration ?? undefined,
       meta: it.meta ?? {},
     }));
 
     // layout in DB may be either an array (legacy) or an object with width/height/elements
-    let elements: any[] = [];
+    interface CanvasLayoutObj {
+      width?: number;
+      height?: number;
+      elements?: unknown[];
+    }
+    let elements: unknown[] = [];
     let canvasWidth: number | null = null;
     let canvasHeight: number | null = null;
     if (Array.isArray(data?.layout)) {
-      elements = data.layout;
+      elements = data.layout as unknown[];
     } else if (data?.layout && typeof data.layout === "object") {
-      elements = data.layout.elements ?? [];
-      canvasWidth = data.layout.width ?? null;
-      canvasHeight = data.layout.height ?? null;
+      const layout = data.layout as CanvasLayoutObj;
+      elements = layout.elements ?? [];
+      canvasWidth = layout.width ?? null;
+      canvasHeight = layout.height ?? null;
     }
 
     return NextResponse.json({
@@ -120,7 +136,7 @@ export async function DELETE(req: Request) {
       { status: 500 }
     );
   const supabase = getSupabase()!;
-  const url = new URL((req as any).url || "http://localhost");
+  const url = new URL((req as Request).url || "http://localhost");
   const id = url.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
   // remove timeline items then canvas

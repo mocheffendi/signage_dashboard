@@ -1,4 +1,6 @@
-/* eslint-disable @next/next/no-inline-styles */
+"use client";
+// eslint-disable-next-line
+/* eslint-disable @next/next/no-img-element, @next/next/no-inline-styles, @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -132,6 +134,13 @@ export default function CanvasEditor({
     e.dataTransfer.setData("text/fileId", id);
   }
 
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    try {
+      e.dataTransfer!.dropEffect = "copy";
+    } catch {}
+  }
+
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     const fileId = e.dataTransfer.getData("text/fileId");
@@ -166,54 +175,32 @@ export default function CanvasEditor({
       v.preload = "metadata";
       v.src = file.url;
       const onMeta = () => {
-        const seconds = Math.max(1, Math.ceil(v.duration || 0));
-        setTimeline((prev) =>
-          prev.map((t) =>
-            t.id === el.id ? { ...t, duration_seconds: seconds } : t
-          )
-        );
-        v.removeEventListener("loadedmetadata", onMeta);
-      };
-      v.addEventListener("loadedmetadata", onMeta);
-      setTimeout(() => {
         try {
-          v.removeEventListener("loadedmetadata", onMeta);
-        } catch {}
-      }, 30_000);
-    }
-  }
-
-  function onDragOver(e: React.DragEvent) {
-    e.preventDefault();
-  }
-
-  function openQuickAdd(file: FileItem) {
-    setSelectedFileForAdd(file);
-    setQuickPos("center");
-    setQuickWidth(200);
-    setQuickHeight(120);
-    setQuickDuration(5);
-    if (file.type?.startsWith("video") && file.url) {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.src = file.url;
-      const onMeta = () => {
-        const dur = Math.max(1, Math.ceil(v.duration || 0));
-        setQuickDuration(dur);
-        // try to read natural size and auto-expand if aspect matches canvas
-        const vw = (v.videoWidth || 0) as number;
-        const vh = (v.videoHeight || 0) as number;
-        if (vw > 0 && vh > 0) {
-          const videoAspect = vw / vh;
-          const canvasAspect = canvasWidth / canvasHeight;
-          const tol = 0.03; // 3% tolerance
-          if (Math.abs(videoAspect - canvasAspect) / canvasAspect < tol) {
-            setQuickWidth(canvasWidth);
-            setQuickHeight(canvasHeight);
-            setQuickPos("center");
+          const seconds = Math.max(1, Math.ceil(v.duration || 0));
+          setTimeline((prev) =>
+            prev.map((t) =>
+              t.id === el.id ? { ...t, duration_seconds: seconds } : t
+            )
+          );
+          setQuickDuration(seconds);
+          // try to read natural size and auto-expand if aspect matches canvas
+          const vw = v.videoWidth || 0;
+          const vh = v.videoHeight || 0;
+          if (vw > 0 && vh > 0) {
+            const videoAspect = vw / vh;
+            const canvasAspect = canvasWidth / canvasHeight;
+            const tol = 0.03; // 3% tolerance
+            if (Math.abs(videoAspect - canvasAspect) / canvasAspect < tol) {
+              setQuickWidth(canvasWidth);
+              setQuickHeight(canvasHeight);
+              setQuickPos("center");
+            }
           }
+        } finally {
+          try {
+            v.removeEventListener("loadedmetadata", onMeta);
+          } catch {}
         }
-        v.removeEventListener("loadedmetadata", onMeta);
       };
       v.addEventListener("loadedmetadata", onMeta);
       setTimeout(() => {
@@ -222,6 +209,14 @@ export default function CanvasEditor({
         } catch {}
       }, 30000);
     }
+  }
+
+  function openQuickAdd(file: FileItem) {
+    setSelectedFileForAdd(file);
+    setQuickWidth(Math.min(200, canvasWidth));
+    setQuickHeight(Math.min(120, canvasHeight));
+    setQuickDuration(5);
+    setQuickPos("center");
   }
 
   function closeQuickAdd() {
