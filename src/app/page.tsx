@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import dynamic from "next/dynamic";
+
+const CanvasEditor = dynamic(() => import("@/components/CanvasEditor"), {
+  ssr: false,
+});
 
 type FileMeta = {
   id: string;
@@ -16,16 +21,36 @@ type Player = {
 };
 
 export default function Dashboard() {
-  const [tab, setTab] = useState<"gallery" | "players">("gallery");
+  const [tab, setTab] = useState<"gallery" | "players" | "canvas">("gallery");
+  const [canvases, setCanvases] = useState<Array<{ id: string; name: string }>>(
+    []
+  );
+  const [editingCanvasId, setEditingCanvasId] = useState<string | null>(null);
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // modal for new template / rename
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"new" | "rename">("new");
+  const [modalCanvasId, setModalCanvasId] = useState<string | null>(null);
+  const [modalName, setModalName] = useState<string>("Untitled");
 
   useEffect(() => {
     fetchFiles();
     fetchPlayers();
+    fetchCanvases();
   }, []);
+
+  async function fetchCanvases() {
+    try {
+      const res = await fetch("/api/canvas");
+      const data = await res.json();
+      setCanvases(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  }
 
   async function fetchFiles() {
     try {
@@ -47,7 +72,7 @@ export default function Dashboard() {
     }
   }
 
-  function handleTab(t: "gallery" | "players") {
+  function handleTab(t: "gallery" | "players" | "canvas") {
     setTab(t);
     setSelectedPlayer(null);
   }
@@ -138,6 +163,14 @@ export default function Dashboard() {
             onClick={() => handleTab("players")}
           >
             Players
+          </button>
+          <button
+            className={`px-3 py-1 rounded ${
+              tab === "canvas" ? "bg-gray-800 text-white" : "border"
+            }`}
+            onClick={() => handleTab("canvas")}
+          >
+            Canvas
           </button>
         </div>
       </header>
@@ -236,6 +269,142 @@ export default function Dashboard() {
                 onAssignToggle={(fileId) =>
                   toggleAssign(selectedPlayer, fileId)
                 }
+              />
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === "canvas" && (
+        <section>
+          {!editingCanvasId ? (
+            <div>
+              <div className="mb-4 flex items-center gap-2">
+                <button
+                  className="px-3 py-1 bg-blue-600 text-white rounded"
+                  onClick={async () => {
+                    const id = `canvas-${Date.now()}`;
+                    const name = "Untitled";
+                    const body = { id, name, layout: [], timeline: [] };
+                    try {
+                      const res = await fetch("/api/canvas", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                      });
+                      if (!res.ok) throw new Error("create failed");
+                      setEditingCanvasId(id);
+                      fetchCanvases();
+                    } catch (err) {
+                      console.error(err);
+                      alert("Failed to create template");
+                    }
+                  }}
+                >
+                  New template
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                {canvases.length === 0 && (
+                  <div className="text-gray-500">No templates saved yet.</div>
+                )}
+                {canvases.map((c) => (
+                  <div key={c.id} className="border rounded p-3">
+                    <div className="font-semibold">{c.name}</div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        className="px-2 py-1 border rounded"
+                        onClick={() => setEditingCanvasId(c.id)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="px-2 py-1 border rounded"
+                        onClick={() => {
+                          // open rename modal
+                          setModalMode("rename");
+                          setModalCanvasId(c.id);
+                          setModalName(c.name || "Untitled");
+                          setModalOpen(true);
+                        }}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        className="px-2 py-1 border rounded"
+                        onClick={async () => {
+                          // duplicate
+                          try {
+                            const res = await fetch(
+                              `/api/canvas?id=${encodeURIComponent(c.id)}`
+                            );
+                            if (!res.ok) throw new Error("fetch failed");
+                            const data = await res.json();
+                            const newId = `canvas-${Date.now()}`;
+                            const newName = `Copy of ${data.name || c.name}`;
+                            const body = {
+                              id: newId,
+                              name: newName,
+                              layout: data.layout ?? [],
+                              timeline: data.timeline ?? [],
+                            };
+                            const post = await fetch("/api/canvas", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(body),
+                            });
+                            if (!post.ok) throw new Error("create failed");
+                            fetchCanvases();
+                          } catch (err) {
+                            console.error(err);
+                            alert("Duplicate failed");
+                          }
+                        }}
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        className="px-2 py-1 border rounded text-red-600"
+                        onClick={async () => {
+                          if (!confirm("Delete this template?")) return;
+                          try {
+                            const res = await fetch(
+                              `/api/canvas?id=${encodeURIComponent(c.id)}`,
+                              { method: "DELETE" }
+                            );
+                            if (!res.ok) throw new Error("delete failed");
+                            fetchCanvases();
+                          } catch (err) {
+                            console.error(err);
+                            alert("Delete failed");
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <button
+                className="px-2 py-1 border rounded mb-2"
+                onClick={() => {
+                  setEditingCanvasId(null);
+                  fetchCanvases();
+                }}
+              >
+                Back to templates
+              </button>
+              <CanvasEditor
+                canvasId={editingCanvasId}
+                onSaved={(id) => {
+                  console.log("saved", id);
+                  setEditingCanvasId(null);
+                  fetchCanvases();
+                }}
               />
             </div>
           )}
